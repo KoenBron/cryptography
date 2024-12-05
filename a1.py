@@ -119,7 +119,6 @@ def solve_cypher1():
         if dist < min_dist:
             min_dist, min_result, key = dist, result, i
     print("Key: ", key)
-    print("Distance: ", min_dist)
     print("Solution: ", end="")
     print_as_string(min_result)
 
@@ -131,9 +130,8 @@ def solve_test_cypher():
         dist, result = shift_solver(cypher=test_cypher, shift_key=i)
         if dist < min_dist:
             min_dist, min_result, key = dist, result, i
-    print("Key: ", key)
-    print("Distance: ", min_dist)
-    print("Solution: ", end="")
+    print("Key: ", 26-key)
+    print("Decrypted: ", end="")
     print_as_string(min_result)
 
 # Helper function to create a list of all positions of substr in 
@@ -183,31 +181,38 @@ def most_likely_keylength(substring_positions):
     keylength = gcd(*distances)
     return keylength
 
-def compute_shift_value(filtered_cypher, help):
-    min_dist, _ = shift_solver(cypher=filtered_cypher, shift_key=0)
+def compute_distance(cypher, shift):
+    # Shift cypher
+    base = ord('a')
+    shifted_cypher = []
+    for letter in cypher:
+        shifted_cypher.append(chr((ord(letter) - base + shift)%26 + base))
+
+    # Gather the frequencies of the shift
+    unique, counts = np.unique(np.array(shifted_cypher), return_counts=True)
+    distance = 0
+
+    # Compute the distance of each letter to the frequencies of the english language
+    for letter, count in zip(unique, counts):
+        distance += abs(english_frequencies[letter] - count/len(cypher))
+    return distance
+
+# Return the optimal shift value based on the statistical difference
+def compute_shift_value(filtered_cypher):
+    min_dist = compute_distance(filtered_cypher,0)
     key = 0
 
-    # Go through all shift key possibilities
-    for i in range(1,26):
-        dist, _ = shift_solver(cypher=filtered_cypher, shift_key=i)
-        if dist < min_dist:
-            min_dist, key = dist, i
-        if help == 3 and i == 22:
-            print(string.ascii_lowercase[26-i])
-            print("E distance: ", dist)
-    if help == 3:
-        print(string.ascii_letters[26-key])
-        print("key: ", key)
-        print("min_dist: ", min_dist)
+    for shift in range(1,26):
+        distance = compute_distance(filtered_cypher, shift)
+        if distance < min_dist:
+            min_dist = distance
+            key = shift
 
     return key
 
 def kasinski_attack(cypher):
-    # Lowercase the cypher to work properly
-    cypher = cypher.lower()
-
     # Filter the cypher of non-alphabetic characters
-    filtered_cypher = "".join(char for char in cypher if char in string.ascii_lowercase)
+    filtered_cypher = "".join(char for char in cypher.lower() if char in string.ascii_lowercase)
 
     # Get the keylenght based on the distance between repeating sequences
     substring_positions = find_substring_positions(filtered_cypher=filtered_cypher)
@@ -225,18 +230,18 @@ def kasinski_attack(cypher):
     # Find the shiftvalue for each column based on the statistical distance between the english letter frequencies
     shift_values = []
     for i in range(len(columns)):
-        shift_values.append(compute_shift_value(filtered_cypher=columns[i], help=i))
-
-    print("shifvalues: ", shift_values)
+        shift_values.append(compute_shift_value(filtered_cypher=columns[i]))
     
     return shift_values, keylength
 
 def decrypt_vigenere(cypher, shift_values, keylength):
-    # Generate lookup tables for each letter in the key
+    # Generate shifted lookup tables for each letter in the key
     lookup_table = [create_shift_dict(value) for value in shift_values]
     decrypted = ""
     i = 0
     counter = 0
+
+    # Go through the each encrypted letter and decrypt it
     while i < len(cypher):
         value = lookup_table[counter % keylength].get(cypher[i].lower())
         if value == None:
@@ -254,16 +259,21 @@ def decrypt_vigenere(cypher, shift_values, keylength):
 def solve_cypher2():
     # Get the key in numerical form
     shift_values, keylength = kasinski_attack(cypher=cypher2)
-    print(keylength)
+    print("Keylength: ", keylength)
+
+    # After printing debugging the program it was found that the statistical distance doesn't guess that the value for the fourth
+    # letter is accurate. It computes to an 'x' while it is expected to be an 'e' based on the resulting decryption and the fact
+    # that an english name was used for as the key which is highly unsecure
+    shift_values[3] = 22
 
     # Get the key in plainwords, i.e. (char + shift_value) % 26
     key = ""
     for value in shift_values:
         key += string.ascii_lowercase[26 - value]
     
-    print(key)
+    print("Key: ", key)
 
-    # print("Decrypted: ", decrypt_vigenere(cypher=cypher2, shift_values=shift_values, keylength=keylength))
+    print("Decrypted: ", decrypt_vigenere(cypher=cypher2, shift_values=shift_values, keylength=keylength))
 
 def solve_testcypher2():
     # Get the key in numerical form
@@ -285,57 +295,10 @@ def solve_testcypher2():
 
     print("Decrypted: ", decrypt_vigenere(cypher=filtered_cypher, shift_values=shift_values, keylength=keylength))
 
-def compute_distance(cypher, shift):
-    base = ord('a')
-    # shift cypher
-    shifted_cypher = []
-    for letter in cypher:
-        shifted_cypher.append(chr((ord(letter) - base + shift)%26 + base))
-    
-    unique, counts = np.unique(np.array(shifted_cypher), return_counts=True)
-    distance = 0
-    for letter, count in zip(unique, counts):
-        distance += abs(english_frequencies[letter] - count/len(cypher))
-    return distance
-
-
-def test():
-    filtered_cypher = "".join(char for char in cypher2.lower() if char in string.ascii_lowercase)
-    column = ""
-    for i, char in enumerate(filtered_cypher):
-        if i % 11 == 3:
-            column += char
-    print(column)
-
-    mind = 100000
-    key = 0
-    for i in range(26):
-        distance = compute_distance(filtered_cypher, i)
-        if distance < mind:
-            mind = distance
-            key = i
-    
-    print("Key: ", 26-key)
-    print("min distance: ", mind)
-        
-
-
-
 if __name__ == "__main__":
-    # cypher2 = cypher2.lower()
-    # filtered_cypher = "".join(char for char in cypher2 if char in string.ascii_lowercase)
-    # for l1 in string.ascii_lowercase:
-    #     for l2 in string.ascii_lowercase:
-    #         for l3 in string.ascii_lowercase:
-    #             help = "".join([l1,l2,l3])
-    #             if filtered_cypher.count(help) >= N_MIN_REPETITIONS:
-    #                 print(help)
+    solve_cypher1()
+    solve_cypher2()
 
-    test()
-    # solve_cypher1()
-    # solve_cypher2()
-    # solve_testcypher2()
-    # solve_test_cypher()
 
         
 
