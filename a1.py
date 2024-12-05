@@ -189,13 +189,14 @@ def compute_distance(cypher, shift):
         shifted_cypher.append(chr((ord(letter) - base + shift)%26 + base))
 
     # Gather the frequencies of the shift
-    unique, counts = np.unique(np.array(shifted_cypher), return_counts=True)
+    letters, counts = np.unique(np.array(shifted_cypher), return_counts=True)
+    shifted_frequency = {letter: count/len(shifted_cypher) for letter, count in zip(letters,counts)}
     distance = 0
 
     # Compute the distance of each letter to the frequencies of the english language
-    for letter, count in zip(unique, counts):
-        distance += abs(english_frequencies[letter] - count/len(cypher))
-    return distance
+    for letter in english_frequencies.keys():
+        distance += abs(english_frequencies.get(letter, 0) - shifted_frequency.get(letter, 0))
+    return distance/2
 
 # Return the optimal shift value based on the statistical difference
 def compute_shift_value(filtered_cypher):
@@ -260,11 +261,6 @@ def solve_cypher2():
     # Get the key in numerical form
     shift_values, keylength = kasinski_attack(cypher=cypher2)
     print("Keylength: ", keylength)
-
-    # After printing debugging the program it was found that the statistical distance doesn't guess that the value for the fourth
-    # letter is accurate. It computes to an 'x' while it is expected to be an 'e' based on the resulting decryption and the fact
-    # that an english name was used for as the key which is highly unsecure
-    shift_values[3] = 22
 
     # Get the key in plainwords, i.e. (char + shift_value) % 26
     key = ""
